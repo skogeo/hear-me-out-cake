@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import axios from 'axios';
 import { Upload, X, Loader2, ImagePlus } from 'lucide-react';
 
-function ImageUploader({ onImageUpload, maxImages = 3, existingImages = [] }) {
+function ImageUploader({ onImageUpload, maxImages = 20, existingImages = [] }) {
   const [uploading, setUploading] = useState(false);
   const [images, setImages] = useState(existingImages);
   const [error, setError] = useState('');
