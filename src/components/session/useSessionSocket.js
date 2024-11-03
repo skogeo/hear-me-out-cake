@@ -29,7 +29,7 @@ export const useSessionSocket = ({
       console.log('Socket connected');
       setSocket(newSocket);
 
-      // Переподключаемся к сессии, если есть сохранённые данные
+      // Reconnect to session if there are saved session data
       const savedSession = localStorage.getItem('sessionData');
       if (savedSession) {
         const { sessionId, username } = JSON.parse(savedSession);
@@ -65,19 +65,21 @@ export const useSessionSocket = ({
       setSessionStatus(status);
       setCurrentRevealIndex(currentRevealIndex);
 
-      // Обновляем состояние текущего пользователя
+      // Update the current user's state
       const currentParticipant = participants.find(p => p.username === username);
       if (currentParticipant) {
         setIsReady(currentParticipant.ready);
-        if (images && images.length === 0 && currentParticipant.images.length > 0) {
-          console.log('Restoring user images:', currentParticipant.images);
-          setImages(currentParticipant.images);
-        }
       }
 
       if (status === 'viewing') {
         setIsViewingMode(true);
       }
+    });
+
+    // Handle participant images event
+    newSocket.on('participantImages', ({ images }) => {
+      console.log('Restoring user images:', images);
+      setImages(images);
     });
 
     newSocket.on('sessionStarted', ({ currentRevealIndex, participants, status }) => {
