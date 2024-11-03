@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import PropTypes from 'prop-types';
 import axios from 'axios';
 
 function ImageUploader({ onImageUpload, maxImages = 3 }) {
@@ -103,5 +104,10 @@ function ImageUploader({ onImageUpload, maxImages = 3 }) {
     </div>
   );
 }
+
+ImageUploader.propTypes = {
+  onImageUpload: PropTypes.func.isRequired,
+  maxImages: PropTypes.number
+};
 
 export default ImageUploader;

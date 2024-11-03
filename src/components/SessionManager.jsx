@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import io from 'socket.io-client';
 import axios from 'axios';
 import ImageUploader from './ImageUploader';
+import CakeViewer from './CakeViewer';
 
 function SessionManager() {
   const [mode, setMode] = useState('initial'); // initial, create, join, active
@@ -14,6 +15,7 @@ function SessionManager() {
   const [readyCount, setReadyCount] = useState(0);
   const [images, setImages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isViewingMode, setIsViewingMode] = useState(false);
 
   // Socket setup
   useEffect(() => {
@@ -36,10 +38,17 @@ function SessionManager() {
       console.log('Session updated:', { participants, readyCount });
       setParticipants(participants);
       setReadyCount(readyCount);
+
+      // Проверяем, все ли участники готовы
+      const allReady = participants.length > 0 && participants.every(p => p.ready);
+      if (allReady) {
+        setIsViewingMode(true);
+      }
     });
 
     newSocket.on('allReady', () => {
       console.log('All participants are ready!');
+      setIsViewingMode(true);
     });
 
     newSocket.on('error', ({ message }) => {
@@ -53,6 +62,19 @@ function SessionManager() {
       newSocket.close();
     };
   }, []);
+
+  const resetState = () => {
+    setMode('initial');
+    setSessionId('');
+    setUsername('');
+    setParticipants([]);
+    setError('');
+    setIsReady(false);
+    setReadyCount(0);
+    setImages([]);
+    setIsLoading(false);
+    setIsViewingMode(false);
+  };
 
   const createSession = async () => {
     if (!username.trim()) {
@@ -156,6 +178,18 @@ function SessionManager() {
       socket.emit('setReady', { sessionId, ready: !isReady });
     }
   };
+
+  // Render states
+  if (mode === 'active' && isViewingMode) {
+    return (
+      <CakeViewer
+        participants={participants}
+        onFinish={() => {
+          resetState();
+        }}
+      />
+    );
+  }
 
   if (mode === 'initial') {
     return (
