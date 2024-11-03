@@ -46,7 +46,7 @@ function ImageUploader({ onImageUpload, maxImages = 3, existingImages = [] }) {
       const formData = new FormData();
       formData.append('image', currentImage.file);
 
-      const response = await axios.post('http://localhost:3001/api/upload', formData, {
+      const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }

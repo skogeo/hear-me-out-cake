@@ -160,7 +160,7 @@ function CakeViewer({ participants, sessionId, currentRevealIndex, onRevealNext,
               {/* Image */}
               <div className="w-full md:w-2/3 relative">
                 <img
-                  src={`http://localhost:3001${selectedImage.url}`}
+                  src={`${import.meta.env.VITE_API_BASE_URL}${selectedImage.url}`}
                   alt={`${selectedImage.username}'s crush`}
                   className="w-full h-[500px] object-cover"
                   onError={(e) => {
