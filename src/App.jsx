@@ -1,4 +1,4 @@
-import SessionManager from './components/SessionManager';
+import SessionManager from './components/session/SessionManager';
 
 function App() {
   return (

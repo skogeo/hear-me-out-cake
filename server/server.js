@@ -55,12 +55,23 @@ const checkSessionState = (sessionId) => {
   if (!session) return;
 
   const allReady = session.participants.every(p => p.ready);
-  if (allReady && !session.canStart && session.participants.length > 0) {
+  const hasParticipants = session.participants.length > 0;
+  
+  if (allReady && hasParticipants && !session.canStart) {
     session.canStart = true;
     io.to(sessionId).emit('sessionUpdate', {
       participants: session.participants,
       readyCount: session.readyParticipants.size,
       canStart: true,
+      status: session.status,
+      currentRevealIndex: session.currentRevealIndex
+    });
+  } else if (!allReady && session.canStart) {
+    session.canStart = false;
+    io.to(sessionId).emit('sessionUpdate', {
+      participants: session.participants,
+      readyCount: session.readyParticipants.size,
+      canStart: false,
       status: session.status,
       currentRevealIndex: session.currentRevealIndex
     });
@@ -75,7 +86,8 @@ const logSessions = () => {
       participants: session.participants.map(p => ({
         username: p.username,
         ready: p.ready,
-        images: p.images.length
+        images: p.images.length,
+        connected: true
       })),
       status: session.status,
       readyCount: session.readyParticipants.size,
@@ -237,6 +249,38 @@ io.on('connection', (socket) => {
       status: session.status,
       currentRevealIndex: session.currentRevealIndex
     });
+  });
+
+  socket.on('leaveSession', ({ sessionId }) => {
+    console.log(`Leave session request - Session: ${sessionId}`);
+    
+    const session = sessions.get(sessionId);
+    if (!session) return;
+
+    const participant = session.participants.find(p => p.id === socket.id);
+    if (participant) {
+      // Очищаем статус готовности
+      session.readyParticipants.delete(socket.id);
+      participant.ready = false;
+      
+      // Пересчитываем возможность старта
+      session.canStart = session.participants.every(p => p.ready);
+      
+      // Покидаем комнату сокета
+      socket.leave(sessionId);
+      
+      console.log(`User ${participant.username} logged out from session ${sessionId}`);
+      
+      io.to(sessionId).emit('sessionUpdate', {
+        participants: session.participants,
+        readyCount: session.readyParticipants.size,
+        canStart: session.canStart,
+        status: session.status,
+        currentRevealIndex: session.currentRevealIndex
+      });
+      
+      logSessions();
+    }
   });
 
   socket.on('setReady', ({ sessionId, ready }) => {
