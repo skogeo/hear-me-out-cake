@@ -147,7 +147,7 @@ function CakeViewer({ participants, sessionId, currentRevealIndex, onRevealNext,
             <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black to-transparent z-10">
               <div className="flex justify-between items-center">
                 <h3 className="text-xl font-semibold text-white">
-                  {selectedImage.username}'s Crush
+                  {selectedImage.username}&#39;s Crush
                 </h3>
                 <button
                   onClick={() => setSelectedImage(null)}
@@ -163,13 +163,13 @@ function CakeViewer({ participants, sessionId, currentRevealIndex, onRevealNext,
               {/* Image */}
               <div className="w-full md:w-2/3 relative">
                 <img
-                  src={`${import.meta.env.VITE_API_BASE_URL}${selectedImage.url}`}
+                  src={selectedImage.preview || `${import.meta.env.VITE_API_BASE_URL}${selectedImage.url}`}
                   alt={`${selectedImage.username}'s crush`}
                   className="w-full h-[500px] object-cover"
-                  onError={(e) => {
-                    console.error('Image load error:', e);
-                    e.target.src = 'https://via.placeholder.com/500';
-                  }}
+                  // onError={(e) => {
+                  //   console.error('Image load error:', e);
+                  //   e.target.src = 'https://via.placeholder.com/500';
+                  // }}
                 />
               </div>
 
