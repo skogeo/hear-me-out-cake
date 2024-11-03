@@ -29,15 +29,6 @@ export const useSessionSocket = ({
       console.log('Socket connected');
       setSocket(newSocket);
 
-      // Reconnect to session if there are saved session data
-      const savedSession = localStorage.getItem('sessionData');
-      if (savedSession) {
-        const { sessionId, username } = JSON.parse(savedSession);
-        if (sessionId && username) {
-          console.log('Reconnecting to session:', { sessionId, username });
-          newSocket.emit('joinSession', { sessionId, username });
-        }
-      }
     });
 
     newSocket.on('disconnect', () => {
@@ -58,7 +49,7 @@ export const useSessionSocket = ({
         status,
         currentRevealIndex 
       });
-      
+
       setParticipants(participants);
       setReadyCount(readyCount);
       setCanStart(canStart);

@@ -47,6 +47,8 @@ function CakeViewer({ participants, sessionId, currentRevealIndex, onRevealNext,
     }))
   );
 
+  const handleImageClick = (image) => setSelectedImage(image)
+
   return (
     <div className="w-full">
       <div className="bg-white rounded-lg shadow-lg overflow-hidden">
@@ -92,6 +94,7 @@ function CakeViewer({ participants, sessionId, currentRevealIndex, onRevealNext,
                       <img 
                         src={image.preview || `${import.meta.env.VITE_API_BASE_URL}${image.url}`}
                         alt={image.characterName}
+                        onClick={() => handleImageClick(image)}
                         className="w-full h-32 object-cover rounded-lg border-2 border-gray-200"
                       />
                       

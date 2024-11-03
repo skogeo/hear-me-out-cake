@@ -55,16 +55,19 @@ function SessionManager() {
       const { sessionId } = await sessionApi.create();
       setSessionId(sessionId);
 
-      // Save session data
-      localStorage.setItem('sessionData', JSON.stringify({ sessionId, username }));
+      await sessionApi.join(sessionId);
 
-      if (socket) {
-        socket.emit('joinSession', { 
-          sessionId, 
-          username: username.trim() 
-        });
+      if (!socket) {
+        throw new Error('Socket connection not established');
       }
-      
+
+
+      socket.emit('joinSession', {
+        sessionId: sessionId,
+        username: username.trim()
+      });
+
+
       setMode('active');
     } catch (err) {
       console.error('Create session error:', err);
@@ -95,11 +98,6 @@ function SessionManager() {
         throw new Error('Socket connection not established');
       }
 
-      // Save session data
-      localStorage.setItem('sessionData', JSON.stringify({ 
-        sessionId: inputSessionId, 
-        username 
-      }));
 
       socket.emit('joinSession', {
         sessionId: inputSessionId,
@@ -172,7 +170,6 @@ function SessionManager() {
     if (socket && sessionId) {
       socket.emit('leaveSession', { sessionId });
     }
-    localStorage.removeItem('sessionData');
     setMode('initial');
     setSessionId('');
     setUsername('');
