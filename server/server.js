@@ -1,9 +1,9 @@
-import express from 'express';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
-import cors from 'cors';
-import multer from 'multer';
-import path from 'path';
+const express = require('express');
+const { createServer } = require('http');
+const { Server } = require('socket.io');
+const cors = require('cors');
+const multer = require('multer');
+const path = require('path');
 
 const app = express();
 const server = createServer(app);
@@ -250,6 +250,7 @@ io.on('connection', (socket) => {
     socket.emit('participantImages', {
       images: participant.images
     });
+    console.log(`Sent images to ${username}:`, participant.images);
   });
 
   socket.on('leaveSession', ({ sessionId }) => {
