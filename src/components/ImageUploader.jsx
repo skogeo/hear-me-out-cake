@@ -183,7 +183,7 @@ function ImageUploader({ onImageUpload, maxImages = 3, existingImages = [] }) {
         {images.map((image, index) => (
           <div key={index} className="relative group">
             <img 
-              src={image.preview || `http://localhost:3001${image.url}`}
+              src={image.preview || `${import.meta.env.VITE_API_BASE_URL}${image.url}`}
               alt={image.characterName}
               className="w-full h-32 object-cover rounded-lg border-2 border-gray-200"
             />

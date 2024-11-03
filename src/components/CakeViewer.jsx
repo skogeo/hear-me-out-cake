@@ -89,15 +89,10 @@ function CakeViewer({ participants, sessionId, currentRevealIndex, onRevealNext,
                   >
                     <div className="relative group">
                       {/* Изображение */}
-                      <img
-                        src={`http://localhost:3001${image.url}`}
-                        alt={`${image.username}'s crush`}
-                        className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-lg cursor-pointer hover:border-pink-400 transition-colors"
-                        onClick={() => setSelectedImage(image)}
-                        onError={(e) => {
-                          console.error('Image load error:', e);
-                          e.target.src = 'https://via.placeholder.com/150';
-                        }}
+                      <img 
+                        src={image.preview || `${import.meta.env.VITE_API_BASE_URL}${image.url}`}
+                        alt={image.characterName}
+                        className="w-full h-32 object-cover rounded-lg border-2 border-gray-200"
                       />
                       
                       {/* Информация при наведении */}
