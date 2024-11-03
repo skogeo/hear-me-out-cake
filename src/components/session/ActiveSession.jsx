@@ -62,7 +62,7 @@ export const ActiveSession = ({
       </div>
       <ImageUploader 
         onImageUpload={onImageUpload}
-        maxImages={3}
+        maxImages={20}
         existingImages={images}
       />
     </div>
