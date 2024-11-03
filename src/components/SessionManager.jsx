@@ -3,6 +3,7 @@ import io from 'socket.io-client';
 import axios from 'axios';
 import ImageUploader from './ImageUploader';
 import CakeViewer from './CakeViewer';
+import { Loader2 } from 'lucide-react';
 
 function SessionManager() {
   const [mode, setMode] = useState('initial'); // initial, create, join, active
@@ -15,7 +16,23 @@ function SessionManager() {
   const [readyCount, setReadyCount] = useState(0);
   const [images, setImages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [canStart, setCanStart] = useState(false);
+  const [sessionStatus, setSessionStatus] = useState('waiting');
+  const [currentRevealIndex, setCurrentRevealIndex] = useState(-1);
   const [isViewingMode, setIsViewingMode] = useState(false);
+
+  // Восстанавливаем сессию из localStorage при загрузке
+  useEffect(() => {
+    const savedSession = localStorage.getItem('sessionData');
+    if (savedSession) {
+      const { sessionId, username } = JSON.parse(savedSession);
+      setSessionId(sessionId);
+      setUsername(username);
+      if (sessionId && username) {
+        setMode('active');
+      }
+    }
+  }, []);
 
   // Socket setup
   useEffect(() => {
@@ -28,27 +45,70 @@ function SessionManager() {
     newSocket.on('connect', () => {
       console.log('Socket connected');
       setSocket(newSocket);
+
+      // Переподключаемся к сессии, если есть сохранённые данные
+      const savedSession = localStorage.getItem('sessionData');
+      if (savedSession) {
+        const { sessionId, username } = JSON.parse(savedSession);
+        if (sessionId && username) {
+          console.log('Reconnecting to session:', { sessionId, username });
+          newSocket.emit('joinSession', { sessionId, username });
+        }
+      }
     });
 
     newSocket.on('disconnect', () => {
       console.log('Socket disconnected');
     });
 
-    newSocket.on('sessionUpdate', ({ participants, readyCount }) => {
-      console.log('Session updated:', { participants, readyCount });
+    newSocket.on('sessionUpdate', ({ 
+      participants, 
+      readyCount, 
+      canStart, 
+      status,
+      currentRevealIndex 
+    }) => {
+      console.log('Session update received:', { 
+        participants, 
+        readyCount, 
+        canStart, 
+        status,
+        currentRevealIndex 
+      });
+      
       setParticipants(participants);
       setReadyCount(readyCount);
+      setCanStart(canStart);
+      setSessionStatus(status);
+      setCurrentRevealIndex(currentRevealIndex);
 
-      // Проверяем, все ли участники готовы
-      const allReady = participants.length > 0 && participants.every(p => p.ready);
-      if (allReady) {
+      // Обновляем состояние текущего пользователя
+      const currentParticipant = participants.find(p => p.username === username);
+      if (currentParticipant) {
+        setIsReady(currentParticipant.ready);
+        if (images.length === 0 && currentParticipant.images.length > 0) {
+          console.log('Restoring user images:', currentParticipant.images);
+          setImages(currentParticipant.images);
+        }
+      }
+
+      if (status === 'viewing') {
         setIsViewingMode(true);
       }
     });
 
-    newSocket.on('allReady', () => {
-      console.log('All participants are ready!');
+    newSocket.on('sessionStarted', ({ currentRevealIndex, participants, status }) => {
+      console.log('Session started:', { currentRevealIndex, participants, status });
+      setSessionStatus(status);
+      setCurrentRevealIndex(currentRevealIndex);
+      setParticipants(participants);
       setIsViewingMode(true);
+    });
+
+    newSocket.on('revealNext', ({ currentRevealIndex, participants }) => {
+      console.log('Reveal next:', { currentRevealIndex, participants });
+      setCurrentRevealIndex(currentRevealIndex);
+      setParticipants(participants);
     });
 
     newSocket.on('error', ({ message }) => {
@@ -61,20 +121,7 @@ function SessionManager() {
       console.log('Cleaning up socket connection');
       newSocket.close();
     };
-  }, []);
-
-  const resetState = () => {
-    setMode('initial');
-    setSessionId('');
-    setUsername('');
-    setParticipants([]);
-    setError('');
-    setIsReady(false);
-    setReadyCount(0);
-    setImages([]);
-    setIsLoading(false);
-    setIsViewingMode(false);
-  };
+  }, [username, images.length]); // Зависимости обновлены
 
   const createSession = async () => {
     if (!username.trim()) {
@@ -91,6 +138,9 @@ function SessionManager() {
       
       console.log('Session created:', sessionId);
       setSessionId(sessionId);
+
+      // Сохраняем данные сессии
+      localStorage.setItem('sessionData', JSON.stringify({ sessionId, username }));
 
       if (socket) {
         socket.emit('joinSession', { 
@@ -134,6 +184,12 @@ function SessionManager() {
           throw new Error('Socket connection not established');
         }
 
+        // Сохраняем данные сессии
+        localStorage.setItem('sessionData', JSON.stringify({ 
+          sessionId: inputSessionId, 
+          username 
+        }));
+
         socket.emit('joinSession', {
           sessionId: inputSessionId,
           username: username.trim()
@@ -157,13 +213,35 @@ function SessionManager() {
 
   const handleImageUpload = (newImage) => {
     console.log('New image uploaded:', newImage);
-    setImages(prev => [...prev, newImage]);
-    
-    if (socket) {
-      socket.emit('uploadImages', {
-        sessionId,
-        images: [...images, newImage]
-      });
+    setImages(prev => {
+      const newImages = [...prev, newImage];
+      if (socket) {
+        socket.emit('uploadImages', {
+          sessionId,
+          images: newImages
+        });
+      }
+      return newImages;
+    });
+  };
+
+  const handleStart = async () => {
+    try {
+      setError('');
+      await axios.post(`http://localhost:3001/api/sessions/${sessionId}/start`);
+    } catch (err) {
+      console.error('Start session error:', err);
+      setError('Failed to start session');
+    }
+  };
+
+  const handleRevealNext = async () => {
+    try {
+      setError('');
+      await axios.post(`http://localhost:3001/api/sessions/${sessionId}/reveal`);
+    } catch (err) {
+      console.error('Reveal next error:', err);
+      setError('Failed to reveal next');
     }
   };
 
@@ -173,24 +251,31 @@ function SessionManager() {
       return;
     }
     
-    setIsReady(!isReady);
+    const newReadyState = !isReady;
+    setIsReady(newReadyState);
     if (socket) {
-      socket.emit('setReady', { sessionId, ready: !isReady });
+      socket.emit('setReady', { sessionId, ready: newReadyState });
     }
   };
 
-  // Render states
-  if (mode === 'active' && isViewingMode) {
-    return (
-      <CakeViewer
-        participants={participants}
-        onFinish={() => {
-          resetState();
-        }}
-      />
-    );
-  }
+  const resetState = () => {
+    localStorage.removeItem('sessionData');
+    setMode('initial');
+    setSessionId('');
+    setUsername('');
+    setParticipants([]);
+    setError('');
+    setIsReady(false);
+    setReadyCount(0);
+    setImages([]);
+    setIsLoading(false);
+    setCanStart(false);
+    setSessionStatus('waiting');
+    setCurrentRevealIndex(-1);
+    setIsViewingMode(false);
+  };
 
+  // Render conditions
   if (mode === 'initial') {
     return (
       <div className="space-y-4">
@@ -252,8 +337,9 @@ function SessionManager() {
           <button
             onClick={mode === 'create' ? createSession : joinSession}
             disabled={isLoading}
-            className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-blue-300"
+            className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-blue-300 flex items-center justify-center gap-2"
           >
+            {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
             {isLoading ? 'Loading...' : mode === 'create' ? 'Create' : 'Join'}
           </button>
         </div>
@@ -261,9 +347,35 @@ function SessionManager() {
     );
   }
 
+  if (mode === 'active' && isViewingMode) {
+    return (
+      <CakeViewer
+        participants={participants}
+        sessionId={sessionId}
+        currentRevealIndex={currentRevealIndex}
+        onRevealNext={handleRevealNext}
+        onFinish={resetState}
+      />
+    );
+  }
+
   if (mode === 'active') {
     return (
       <div className="space-y-6">
+        {/* User info panel */}
+        <div className="bg-blue-50 p-4 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-blue-900">Your Profile:</h3>
+              <p className="text-blue-700">{username}</p>
+            </div>
+            <div className="text-sm text-blue-600">
+              {isReady ? 'Ready to share' : 'Not ready yet'}
+            </div>
+          </div>
+        </div>
+
+        {/* Session ID panel */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <h3 className="font-semibold mb-1">Session ID:</h3>
           <div className="flex items-center gap-2">
@@ -279,19 +391,22 @@ function SessionManager() {
           </div>
         </div>
 
+        {/* Upload section */}
         <div className="border-t pt-4">
-          <h3 className="font-semibold mb-3">Upload Images</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold">Your Crushes</h3>
+            <span className="text-sm text-gray-500">
+              {images.length} of 3 images uploaded
+            </span>
+          </div>
           <ImageUploader 
             onImageUpload={handleImageUpload}
             maxImages={3}
+            existingImages={images}
           />
-          {images.length === 0 && (
-            <p className="text-sm text-gray-500 mt-2">
-              Upload at least one image to continue
-            </p>
-          )}
         </div>
 
+        {/* Participants list */}
         <div className="border-t pt-4">
           <h3 className="font-semibold mb-3">
             Participants ({participants.length})
@@ -301,49 +416,83 @@ function SessionManager() {
               <div
                 key={index}
                 className={`flex items-center justify-between p-3 rounded-lg ${
-                  participant.ready ? 'bg-green-50' : 'bg-gray-50'
+                  participant.username === username 
+                    ? 'border-2 border-blue-300 bg-blue-50' 
+                    : participant.ready 
+                      ? 'bg-green-50' 
+                      : 'bg-gray-50'
                 }`}
               >
-                <span className="font-medium">{participant.username}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{participant.username}</span>
+                  {participant.username === username && (
+                    <span className="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded">
+                      You
+                    </span>
+                  )}
+                  {participant.images.length > 0 && (
+                    <span className="text-xs text-gray-500">
+                      ({participant.images.length} images)
+                    </span>
+                  )}
+                </div>
                 <span
                   className={`text-sm ${
-                    participant.ready ? 'text-green-600' : 'text-gray-500'
-                  }`}
-                >
-                  {participant.ready ? '✓ Ready' : 'Not Ready'}
-                </span>
+                    participant.ready ? 'text-green-600' : 'text-gray-500'}`}
+                    >
+                      {participant.ready ? '✓ Ready' : 'Not Ready'}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+    
+            {/* Ready status and controls */}
+            <div className="border-t pt-4">
+              <div className="text-center text-sm text-gray-600 mb-3">
+                {readyCount} of {participants.length} participants ready
+              </div>
+              <button
+                onClick={toggleReady}
+                disabled={images.length === 0}
+                className={`w-full py-2 rounded-lg transition-colors ${
+                  isReady 
+                    ? 'bg-red-500 hover:bg-red-600' 
+                    : 'bg-green-500 hover:bg-green-600'
+                } text-white disabled:bg-gray-300`}
+              >
+                {isReady ? 'Cancel Ready' : 'Mark as Ready'}
+              </button>
+              {images.length === 0 && (
+                <p className="text-sm text-gray-500 text-center mt-2">
+                  Upload at least one image to mark as ready
+                </p>
+              )}
+            </div>
+    
+            {/* Start button */}
+            {canStart && (
+              <div className="border-t pt-4">
+                <button
+                  onClick={handleStart}
+                  className="w-full py-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors flex items-center justify-center gap-2"
+                >
+                  Start Viewing Session
+                </button>
+              </div>
+            )}
+    
+            {/* Error display */}
+            {error && (
+              <div className="p-3 text-sm text-red-600 bg-red-50 rounded-lg">
+                {error}
+              </div>
+            )}
           </div>
-        </div>
-
-        <div className="border-t pt-4">
-          <div className="text-center text-sm text-gray-600 mb-3">
-            {readyCount} of {participants.length} participants ready
-          </div>
-          <button
-            onClick={toggleReady}
-            disabled={images.length === 0}
-            className={`w-full py-2 rounded-lg transition-colors ${
-              isReady 
-                ? 'bg-red-500 hover:bg-red-600' 
-                : 'bg-green-500 hover:bg-green-600'
-            } text-white disabled:bg-gray-300`}
-          >
-            {isReady ? 'Cancel Ready' : 'Mark as Ready'}
-          </button>
-        </div>
-
-        {error && (
-          <div className="p-3 text-sm text-red-600 bg-red-50 rounded-lg">
-            {error}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  return null;
-}
-
-export default SessionManager;
+        );
+      }
+    
+      return null;
+    }
+    
+    export default SessionManager;

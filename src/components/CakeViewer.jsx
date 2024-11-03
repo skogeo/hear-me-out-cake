@@ -1,12 +1,29 @@
 import { useState, useEffect } from 'react';
-import { Heart, X } from 'lucide-react';
+import { Heart, X, ChevronRight } from 'lucide-react';
 
-function CakeViewer({ participants, onFinish }) {
+function CakeViewer({ participants, sessionId, currentRevealIndex, onRevealNext, onFinish }) {
   const [selectedImage, setSelectedImage] = useState(null);
+  const [revealedImages, setRevealedImages] = useState([]);
+  const [currentParticipantName, setCurrentParticipantName] = useState('');
 
   useEffect(() => {
     console.log('CakeViewer participants:', participants);
-  }, [participants]);
+    console.log('Current reveal index:', currentRevealIndex);
+  }, [participants, currentRevealIndex]);
+
+  // Обновляем список раскрытых изображений при изменении индекса
+  useEffect(() => {
+    const revealed = [];
+    for (let i = 0; i <= currentRevealIndex; i++) {
+      if (participants[i]) {
+        revealed.push(...participants[i].images);
+        if (i === currentRevealIndex) {
+          setCurrentParticipantName(participants[i].username);
+        }
+      }
+    }
+    setRevealedImages(revealed);
+  }, [currentRevealIndex, participants]);
 
   // Функция для расчета позиции каждого изображения
   const calculatePosition = (index, total) => {
@@ -23,15 +40,12 @@ function CakeViewer({ participants, onFinish }) {
     };
   };
 
-  const allImages = participants.flatMap(participant => {
-    console.log('Processing participant:', participant);
-    return participant.images.map(image => ({
+  const allImages = participants.flatMap(participant => 
+    participant.images.map(image => ({
       ...image,
       username: participant.username
-    }));
-  });
-
-  console.log('All processed images:', allImages);
+    }))
+  );
 
   return (
     <div className="w-full">
@@ -41,8 +55,13 @@ function CakeViewer({ participants, onFinish }) {
             Our Hear Me Out Cake
           </h2>
           <p className="text-center text-gray-500 text-lg mt-2">
-            {participants.length} participants shared their crushes
+            {revealedImages.length} of {allImages.length} crushes revealed
           </p>
+          {currentParticipantName && (
+            <p className="text-center text-pink-500 font-medium mt-2">
+              Now revealing: {currentParticipantName}'s crushes
+            </p>
+          )}
         </div>
 
         <div className="relative w-full p-8">
@@ -55,11 +74,17 @@ function CakeViewer({ participants, onFinish }) {
               
               {/* Изображения на торте */}
               {allImages.map((image, index) => {
+                const isRevealed = revealedImages.some(
+                  revealedImg => revealedImg.url === image.url
+                );
+                
+                if (!isRevealed) return null;
+
                 const position = calculatePosition(index, allImages.length);
                 return (
                   <div
                     key={index}
-                    className="absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-300 hover:scale-110 z-10"
+                    className="absolute transform -translate-x-1/2 -translate-y-1/2 transition-all duration-500 hover:scale-110 z-10"
                     style={position}
                   >
                     <div className="relative group">
@@ -75,7 +100,7 @@ function CakeViewer({ participants, onFinish }) {
                         }}
                       />
                       
-                      {/* Имя пользователя и персонажа */}
+                      {/* Информация при наведении */}
                       <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-16 left-1/2 transform -translate-x-1/2 bg-white px-4 py-2 rounded-lg shadow-md text-center whitespace-nowrap">
                         <div className="font-medium text-gray-900">{image.characterName}</div>
                         <div className="text-sm text-gray-500">by {image.username}</div>
@@ -88,15 +113,25 @@ function CakeViewer({ participants, onFinish }) {
           </div>
         </div>
 
-        {/* Кнопка завершения */}
+        {/* Кнопки управления */}
         <div className="p-6 border-t flex justify-center gap-4">
-          <button
-            onClick={onFinish}
-            className="px-8 py-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600 flex items-center gap-2 text-lg transition-colors"
-          >
-            <Heart className="w-6 h-6" />
-            Finish
-          </button>
+          {currentRevealIndex < participants.length - 1 ? (
+            <button
+              onClick={onRevealNext}
+              className="px-8 py-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600 flex items-center gap-2 text-lg transition-colors"
+            >
+              Reveal Next
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          ) : (
+            <button
+              onClick={onFinish}
+              className="px-8 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-2 text-lg"
+            >
+              <Heart className="w-6 h-6" />
+              Finish
+            </button>
+          )}
         </div>
       </div>
 
@@ -173,7 +208,7 @@ function CakeViewer({ participants, onFinish }) {
                     </h4>
                     <div className="mt-2 text-sm text-gray-600">
                       <p>Total participants: {participants.length}</p>
-                      <p>Total crushes: {allImages.length}</p>
+                      <p>Revealed crushes: {revealedImages.length} of {allImages.length}</p>
                     </div>
                   </div>
                 </div>

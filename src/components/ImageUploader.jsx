@@ -1,10 +1,10 @@
 import { useState, useRef } from 'react';
 import axios from 'axios';
-import { X, Upload, Loader2 } from 'lucide-react';
+import { Upload, X, Loader2, ImagePlus } from 'lucide-react';
 
-function ImageUploader({ onImageUpload, maxImages = 3 }) {
+function ImageUploader({ onImageUpload, maxImages = 3, existingImages = [] }) {
   const [uploading, setUploading] = useState(false);
-  const [images, setImages] = useState([]);
+  const [images, setImages] = useState(existingImages);
   const [error, setError] = useState('');
   const [currentImage, setCurrentImage] = useState(null);
   const [characterName, setCharacterName] = useState('');
@@ -87,7 +87,7 @@ function ImageUploader({ onImageUpload, maxImages = 3 }) {
 
   return (
     <div className="space-y-6">
-      {/* Upload button */}
+      {/* Upload button or preview */}
       {!currentImage && (
         <div className="flex items-center gap-4">
           <input
@@ -101,9 +101,13 @@ function ImageUploader({ onImageUpload, maxImages = 3 }) {
           <button
             onClick={() => fileInputRef.current.click()}
             disabled={uploading || images.length >= maxImages}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-400 flex items-center gap-2"
+            className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
+              images.length >= maxImages
+                ? 'bg-gray-300 cursor-not-allowed'
+                : 'bg-blue-500 hover:bg-blue-600 text-white'
+            }`}
           >
-            <Upload className="w-5 h-5" />
+            <ImagePlus className="w-5 h-5" />
             Add Image
           </button>
           <span className="text-sm text-gray-500">
@@ -116,19 +120,27 @@ function ImageUploader({ onImageUpload, maxImages = 3 }) {
       {currentImage && (
         <div className="bg-gray-50 rounded-lg p-4 space-y-4">
           <div className="flex gap-4 items-start">
-            <img 
-              src={currentImage.preview}
-              alt="Preview"
-              className="w-32 h-32 object-cover rounded-lg"
-            />
-            <div className="flex-1 space-y-4">
-              <input
-                type="text"
-                value={characterName}
-                onChange={(e) => setCharacterName(e.target.value)}
-                placeholder="Enter character name"
-                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            <div className="relative group">
+              <img 
+                src={currentImage.preview}
+                alt="Preview"
+                className="w-32 h-32 object-cover rounded-lg border-2 border-gray-200"
               />
+              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all rounded-lg" />
+            </div>
+            <div className="flex-1 space-y-4">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Character Name
+                </label>
+                <input
+                  type="text"
+                  value={characterName}
+                  onChange={(e) => setCharacterName(e.target.value)}
+                  placeholder="Enter character name"
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
               <div className="flex gap-2">
                 <button
                   onClick={handleUpload}
@@ -136,9 +148,15 @@ function ImageUploader({ onImageUpload, maxImages = 3 }) {
                   className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:bg-gray-400 flex items-center gap-2"
                 >
                   {uploading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Uploading...
+                    </>
                   ) : (
-                    'Upload'
+                    <>
+                      <Upload className="w-5 h-5" />
+                      Upload
+                    </>
                   )}
                 </button>
                 <button
@@ -153,31 +171,34 @@ function ImageUploader({ onImageUpload, maxImages = 3 }) {
         </div>
       )}
 
+      {/* Error display */}
       {error && (
-        <div className="text-red-500 text-sm">
+        <div className="text-red-500 text-sm bg-red-50 p-2 rounded-lg">
           {error}
         </div>
       )}
 
-      {/* Uploaded images */}
+      {/* Uploaded images grid */}
       <div className="grid grid-cols-3 gap-4">
         {images.map((image, index) => (
           <div key={index} className="relative group">
             <img 
               src={image.preview || `http://localhost:3001${image.url}`}
               alt={image.characterName}
-              className="w-full h-32 object-cover rounded-lg"
+              className="w-full h-32 object-cover rounded-lg border-2 border-gray-200"
             />
-            <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
-              <div className="text-white text-center p-2">
-                <p className="font-medium">{image.characterName}</p>
+            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all rounded-lg">
+              <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-all">
+                <p className="text-white text-center font-medium px-2">
+                  {image.characterName}
+                </p>
+                <button
+                  onClick={() => removeImage(index)}
+                  className="mt-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <button
-                onClick={() => removeImage(index)}
-                className="absolute top-2 right-2 w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
             </div>
           </div>
         ))}

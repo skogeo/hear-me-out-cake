@@ -4,6 +4,10 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import multer from 'multer';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = createServer(app);
@@ -42,16 +46,41 @@ const upload = multer({
   }
 });
 
-// In-memory sessions storage
+// Sessions storage
 const sessions = new Map();
+
+// Helper function to check session state
+const checkSessionState = (sessionId) => {
+  const session = sessions.get(sessionId);
+  if (!session) return;
+
+  const allReady = session.participants.every(p => p.ready);
+  if (allReady && !session.canStart && session.participants.length > 0) {
+    session.canStart = true;
+    io.to(sessionId).emit('sessionUpdate', {
+      participants: session.participants,
+      readyCount: session.readyParticipants.size,
+      canStart: true,
+      status: session.status,
+      currentRevealIndex: session.currentRevealIndex
+    });
+  }
+};
 
 // Debug helper
 const logSessions = () => {
   console.log('\nCurrent sessions:');
   sessions.forEach((session, id) => {
     console.log(`- Session ${id}:`, {
-      participants: session.participants.map(p => p.username),
-      readyCount: session.readyParticipants.size
+      participants: session.participants.map(p => ({
+        username: p.username,
+        ready: p.ready,
+        images: p.images.length
+      })),
+      status: session.status,
+      readyCount: session.readyParticipants.size,
+      canStart: session.canStart,
+      currentRevealIndex: session.currentRevealIndex
     });
   });
   console.log();
@@ -65,7 +94,9 @@ app.post('/api/sessions', (req, res) => {
     participants: [],
     status: 'waiting',
     created: new Date(),
-    readyParticipants: new Set()
+    readyParticipants: new Set(),
+    canStart: false,
+    currentRevealIndex: -1
   });
   
   console.log(`Created new session: ${sessionId}`);
@@ -87,8 +118,10 @@ app.get('/api/sessions/:sessionId', (req, res) => {
   
   res.json({
     id: session.id,
+    status: session.status,
     participantsCount: session.participants.length,
-    status: session.status
+    canStart: session.canStart,
+    currentRevealIndex: session.currentRevealIndex
   });
 });
 
@@ -106,6 +139,50 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
   });
 });
 
+app.post('/api/sessions/:sessionId/start', (req, res) => {
+  const { sessionId } = req.params;
+  const session = sessions.get(sessionId);
+  
+  if (!session || !session.canStart) {
+    return res.status(400).json({ error: 'Cannot start session' });
+  }
+
+  session.status = 'viewing';
+  session.currentRevealIndex = -1; // Will be incremented to 0 on first reveal
+  
+  console.log(`Starting session: ${sessionId}`);
+  logSessions();
+
+  io.to(sessionId).emit('sessionStarted', {
+    currentRevealIndex: session.currentRevealIndex,
+    participants: session.participants,
+    status: session.status
+  });
+  
+  res.json({ success: true });
+});
+
+app.post('/api/sessions/:sessionId/reveal', (req, res) => {
+  const { sessionId } = req.params;
+  const session = sessions.get(sessionId);
+  
+  if (!session || session.status !== 'viewing') {
+    return res.status(400).json({ error: 'Invalid session state' });
+  }
+
+  session.currentRevealIndex++;
+  
+  console.log(`Revealing next for session ${sessionId}, index: ${session.currentRevealIndex}`);
+  logSessions();
+
+  io.to(sessionId).emit('revealNext', {
+    currentRevealIndex: session.currentRevealIndex,
+    participants: session.participants
+  });
+  
+  res.json({ success: true });
+});
+
 // Socket.IO handlers
 io.on('connection', (socket) => {
   console.log(`Socket connected: ${socket.id}`);
@@ -120,35 +197,45 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Remove user if they were in any other sessions
-    sessions.forEach((s, sid) => {
-      const idx = s.participants.findIndex(p => p.username === username);
-      if (idx !== -1) {
-        s.participants.splice(idx, 1);
-        s.readyParticipants.delete(socket.id);
-        io.to(sid).emit('sessionUpdate', {
-          participants: s.participants,
-          readyCount: s.readyParticipants.size
-        });
+    // Look for existing participant
+    let participant = session.participants.find(p => p.username === username);
+    
+    if (participant) {
+      // Update socket ID for existing user
+      const oldSocketId = participant.id;
+      participant.id = socket.id;
+      
+      // Update ready participants set if needed
+      if (participant.ready) {
+        session.readyParticipants.delete(oldSocketId);
+        session.readyParticipants.add(socket.id);
       }
-    });
+      
+      console.log(`User ${username} reconnected with new socket ID: ${socket.id}`);
+    } else {
+      // Create new participant
+      participant = {
+        id: socket.id,
+        username,
+        joinedAt: new Date(),
+        ready: false,
+        images: []
+      };
+      session.participants.push(participant);
+      console.log(`New user ${username} joined session ${sessionId}`);
+    }
 
-    // Add to new session
     socket.join(sessionId);
-    session.participants.push({
-      id: socket.id,
-      username,
-      joinedAt: new Date(),
-      ready: false,
-      images: []
-    });
-
-    console.log(`User ${username} joined session ${sessionId}`);
+    
+    checkSessionState(sessionId);
     logSessions();
 
     io.to(sessionId).emit('sessionUpdate', {
       participants: session.participants,
-      readyCount: session.readyParticipants.size
+      readyCount: session.readyParticipants.size,
+      canStart: session.canStart,
+      status: session.status,
+      currentRevealIndex: session.currentRevealIndex
     });
   });
 
@@ -165,22 +252,20 @@ io.on('connection', (socket) => {
         session.readyParticipants.add(socket.id);
       } else {
         session.readyParticipants.delete(socket.id);
+        session.canStart = false;
       }
 
       console.log(`User ${participant.username} is ${ready ? 'ready' : 'not ready'}`);
+      checkSessionState(sessionId);
       logSessions();
 
       io.to(sessionId).emit('sessionUpdate', {
         participants: session.participants,
-        readyCount: session.readyParticipants.size
+        readyCount: session.readyParticipants.size,
+        canStart: session.canStart,
+        status: session.status,
+        currentRevealIndex: session.currentRevealIndex
       });
-
-      // Check if all participants are ready
-      if (session.participants.length > 0 && 
-          session.participants.every(p => p.ready)) {
-        console.log('All participants are ready!');
-        io.to(sessionId).emit('allReady');
-      }
     }
   });
 
@@ -191,9 +276,14 @@ io.on('connection', (socket) => {
     const participant = session.participants.find(p => p.id === socket.id);
     if (participant) {
       participant.images = images;
+      console.log(`Updated images for ${participant.username}:`, images);
+      
       io.to(sessionId).emit('sessionUpdate', {
         participants: session.participants,
-        readyCount: session.readyParticipants.size
+        readyCount: session.readyParticipants.size,
+        canStart: session.canStart,
+        status: session.status,
+        currentRevealIndex: session.currentRevealIndex
       });
     }
   });
@@ -202,17 +292,23 @@ io.on('connection', (socket) => {
     console.log(`Socket disconnected: ${socket.id}`);
     
     sessions.forEach((session, sessionId) => {
-      const index = session.participants.findIndex(p => p.id === socket.id);
-      if (index !== -1) {
-        const participant = session.participants[index];
-        console.log(`User ${participant.username} left session ${sessionId}`);
-        
-        session.participants.splice(index, 1);
+      const participant = session.participants.find(p => p.id === socket.id);
+      if (participant) {
+        // Don't remove participant, just update their ready status
         session.readyParticipants.delete(socket.id);
+        participant.ready = false;
+        
+        // Recalculate canStart
+        session.canStart = session.participants.every(p => p.ready);
+        
+        console.log(`User ${participant.username} disconnected from session ${sessionId}`);
         
         io.to(sessionId).emit('sessionUpdate', {
           participants: session.participants,
-          readyCount: session.readyParticipants.size
+          readyCount: session.readyParticipants.size,
+          canStart: session.canStart,
+          status: session.status,
+          currentRevealIndex: session.currentRevealIndex
         });
       }
     });
