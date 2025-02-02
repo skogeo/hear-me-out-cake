@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "deploy": "npm run build && rimraf /var/www/hear-me-out-cake/* && copyfiles -u 1 dist/**/* /var/www/hear-me-out-cake",
+    "deploy": "npm run build && rimraf /var/www/hear-me-out-cake/* && copyfiles -a dist/** /var/www/hear-me-out-cake",
     "lint": "eslint .",
     "preview": "vite preview"
   },
