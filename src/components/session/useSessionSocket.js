@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 
 export const useSessionSocket = ({
@@ -18,17 +18,21 @@ export const useSessionSocket = ({
   setIsLoading,
   setIsViewingMode
 }) => {
+  const socketRef = useRef(null);
+
   useEffect(() => {
     const newSocket = io(import.meta.env.VITE_SOCKET_URL, {
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     });
+
+    socketRef.current = newSocket;
 
     newSocket.on('connect', () => {
       console.log('Socket connected');
       setSocket(newSocket);
-
+      newSocket.emit('joinSession', sessionId);
     });
 
     newSocket.on('disconnect', () => {
@@ -95,7 +99,7 @@ export const useSessionSocket = ({
 
     return () => {
       console.log('Cleaning up socket connection');
-      newSocket.close();
+      newSocket.disconnect();
     };
   }, [username, sessionId, images, setImages, setParticipants, setReadyCount, setCanStart, 
       setSessionStatus, setCurrentRevealIndex, setIsReady, setError, setIsLoading, setIsViewingMode]);
