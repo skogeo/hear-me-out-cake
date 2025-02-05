@@ -89,7 +89,7 @@ function ImageUploader({ onImageUpload, maxImages = 20, existingImages = [] }) {
 
     try {
       const formData = new FormData();
-      formData.append('image', currentImage.file);
+      formData.append('file', currentImage.file); // Change 'image' to 'file'
 
       const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/api/upload`, formData, {
         headers: {
@@ -98,7 +98,7 @@ function ImageUploader({ onImageUpload, maxImages = 20, existingImages = [] }) {
       });
 
       const newImage = {
-        url: response.data.url,
+        url: response.data.url, // URL изображения
         characterName: characterName.trim(),
         preview: currentImage.preview
       };
@@ -113,6 +113,16 @@ function ImageUploader({ onImageUpload, maxImages = 20, existingImages = [] }) {
     } finally {
       setUploading(false);
     }
+  };
+
+  const cancelUpload = () => {
+    setCurrentImage(null);
+    setCharacterName('');
+    setError('');
+  };
+
+  const removeImage = (index) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -146,8 +156,8 @@ function ImageUploader({ onImageUpload, maxImages = 20, existingImages = [] }) {
         </span>
       </div>
 
-           {/* Preview and character name input */}
-           {currentImage && (
+      {/* Preview and character name input */}
+      {currentImage && (
         <div className="bg-gray-50 rounded-lg p-4 space-y-4">
           <div className="flex gap-4 items-start">
             <div className="relative group">

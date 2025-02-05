@@ -47,7 +47,7 @@ function CakeViewer({ participants, sessionId, currentRevealIndex, onRevealNext,
     }))
   );
 
-  const handleImageClick = (image) => setSelectedImage(image)
+  const handleImageClick = (image) => setSelectedImage(image);
 
   return (
     <div className="w-full">
@@ -77,7 +77,7 @@ function CakeViewer({ participants, sessionId, currentRevealIndex, onRevealNext,
               {/* Изображения на торте */}
               {allImages.map((image, index) => {
                 const isRevealed = revealedImages.some(
-                  revealedImg => revealedImg.url === image.url
+                  revealedImg => revealedImg.imageUrl === image.imageUrl
                 );
                 
                 if (!isRevealed) return null;
@@ -92,7 +92,7 @@ function CakeViewer({ participants, sessionId, currentRevealIndex, onRevealNext,
                     <div className="relative group">
                       {/* Изображение */}
                       <img 
-                        src={image.preview || `${import.meta.env.VITE_API_BASE_URL}${image.url}`}
+                        src={image.preview || `${import.meta.env.VITE_API_BASE_URL}${image.imageUrl}`}
                         alt={image.characterName}
                         onClick={() => handleImageClick(image)}
                         className="w-full h-32 object-cover rounded-lg border-2 border-gray-200"
@@ -163,7 +163,7 @@ function CakeViewer({ participants, sessionId, currentRevealIndex, onRevealNext,
               {/* Image */}
               <div className="w-full md:w-2/3 relative">
                 <img
-                  src={selectedImage.preview || `${import.meta.env.VITE_API_BASE_URL}${selectedImage.url}`}
+                  src={selectedImage.preview || `${import.meta.env.VITE_API_BASE_URL}${selectedImage.imageUrl}`}
                   alt={`${selectedImage.username}'s crush`}
                   className="w-full h-[500px] object-cover"
                   // onError={(e) => {

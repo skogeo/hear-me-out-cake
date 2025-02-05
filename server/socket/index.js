@@ -1,12 +1,16 @@
 const { Server } = require('socket.io');
 const SessionManager = require('../services/SessionManager');
 
+const corsOptions = {
+  origin: ['http://localhost:5173', 'https://hear-me-out-cake.skogeo.me'], // Add your frontend URLs here
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+};
+
 function initSocketServer(server) {
   const io = new Server(server, {
-    cors: {
-      origin: '*',
-      methods: ['GET', 'POST']
-    }
+    cors: corsOptions
   });
 
   io.on('connection', (socket) => {

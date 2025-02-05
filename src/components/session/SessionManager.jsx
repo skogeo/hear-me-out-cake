@@ -61,12 +61,10 @@ function SessionManager() {
         throw new Error('Socket connection not established');
       }
 
-
       socket.emit('joinSession', {
         sessionId: sessionId,
         username: username.trim()
       });
-
 
       setMode('active');
     } catch (err) {
@@ -97,7 +95,6 @@ function SessionManager() {
       if (!socket) {
         throw new Error('Socket connection not established');
       }
-
 
       socket.emit('joinSession', {
         sessionId: inputSessionId,
@@ -137,6 +134,8 @@ function SessionManager() {
     try {
       setError('');
       await sessionApi.start(sessionId);
+      setSessionStatus('viewing');
+      setIsViewingMode(true);
     } catch (err) {
       console.error('Start session error:', err);
       setError('Failed to start session');
@@ -146,7 +145,9 @@ function SessionManager() {
   const handleRevealNext = async () => {
     try {
       setError('');
-      await sessionApi.reveal(sessionId);
+      const response = await sessionApi.reveal(sessionId);
+      setCurrentRevealIndex(response.currentRevealIndex);
+      setParticipants(response.participants);
     } catch (err) {
       console.error('Reveal next error:', err);
       setError('Failed to reveal next');

@@ -1,4 +1,3 @@
-// src/services/SessionManager.js
 const { PrismaClient } = require('@prisma/client');
 
 class SessionManager {
@@ -24,10 +23,14 @@ class SessionManager {
   }
 
   static async getSession(sessionId) {
+    if (!sessionId) {
+      throw new Error('Session ID is required');
+    }
+  
     if (this.sessions.has(sessionId)) {
       return this.sessions.get(sessionId);
     }
-
+  
     const session = await this.prisma.session.findUnique({
       where: { id: sessionId },
       include: {
@@ -38,15 +41,16 @@ class SessionManager {
         }
       }
     });
-
+  
     if (!session) return null;
-
+  
+    session.participants = session.participants || [];
     session.readyParticipants = new Set(
       session.participants
         .filter(p => p.ready)
         .map(p => p.socketId)
     );
-
+  
     this.sessions.set(sessionId, session);
     return session;
   }
@@ -128,28 +132,60 @@ class SessionManager {
   static async handleUploadImages(io, socket, { sessionId, images }) {
     const session = await this.getSession(sessionId);
     if (!session) return;
-
+  
     const participant = session.participants.find(p => p.socketId === socket.id);
     if (participant) {
       // Удаляем старые изображения
       await this.prisma.participantImage.deleteMany({
         where: { participantId: participant.id }
       });
-
+  
       // Добавляем новые
       await this.prisma.participantImage.createMany({
-        data: images.map(imageUrl => ({
-          imageUrl,
+        data: images.map(image => ({
+          imageUrl: image.url, // Передаем только URL изображения
           participantId: participant.id
         }))
       });
-
+  
       // Обновляем кэш
       participant.images = await this.prisma.participantImage.findMany({
         where: { participantId: participant.id }
       });
-
+  
       this.emitSessionUpdate(io, session);
+    }
+  }
+
+  static async handleDisconnect(io, socket) {
+    for (const [sessionId, session] of this.sessions.entries()) {
+      const participantIndex = session.participants.findIndex(p => p.socketId === socket.id);
+      if (participantIndex !== -1) {
+        const participant = session.participants[participantIndex];
+  
+        // Удаляем связанные изображения
+        await this.prisma.participantImage.deleteMany({
+          where: { participantId: participant.id }
+        });
+  
+        // Проверяем, существует ли участник перед удалением
+        const existingParticipant = await this.prisma.participant.findUnique({
+          where: { id: participant.id }
+        });
+  
+        if (existingParticipant) {
+          // Удаляем участника
+          await this.prisma.participant.delete({
+            where: { id: participant.id }
+          });
+        }
+  
+        session.participants.splice(participantIndex, 1);
+        session.readyParticipants.delete(socket.id);
+  
+        await this.checkSessionState(io, sessionId);
+        break;
+      }
     }
   }
 
@@ -170,6 +206,101 @@ class SessionManager {
     }
 
     this.emitSessionUpdate(io, session);
+  }
+
+  static async handleStartSession(io, sessionId) {
+    const session = await this.getSession(sessionId);
+    if (!session || !session.canStart) {
+      throw new Error('Cannot start session');
+    }
+  
+    // Update session status in the database
+    await this.prisma.session.update({
+      where: { id: sessionId },
+      data: {
+        status: 'viewing',
+        currentRevealIndex: -1
+      }
+    });
+  
+    session.status = 'viewing';
+    session.currentRevealIndex = -1;
+  
+    // Emit session started event through socket
+    io.to(sessionId).emit('sessionStarted', {
+      currentRevealIndex: session.currentRevealIndex,
+      participants: session.participants,
+      status: session.status
+    });
+  
+    this.sessions.set(sessionId, session);
+  }
+
+  static async handleRevealNext(io, sessionId) {
+    const session = await this.getSession(sessionId);
+    if (!session) {
+      throw new Error('Session not found');
+    }
+  
+    if (session.currentRevealIndex >= session.participants.length - 1) {
+      throw new Error('All participants have been revealed');
+    }
+  
+    session.currentRevealIndex += 1;
+  
+    // Update session in the database
+    await this.prisma.session.update({
+      where: { id: sessionId },
+      data: {
+        currentRevealIndex: session.currentRevealIndex
+      }
+    });
+  
+    // Emit reveal next event through socket
+    io.to(sessionId).emit('revealNext', {
+      currentRevealIndex: session.currentRevealIndex,
+      participants: session.participants
+    });
+  
+    this.sessions.set(sessionId, session);
+  
+    return {
+      currentRevealIndex: session.currentRevealIndex,
+      participants: session.participants
+    };
+  }
+
+
+  static async handleLeaveSession(io, socket, { sessionId }) {
+    const session = await this.getSession(sessionId);
+    if (!session) return;
+  
+    const participantIndex = session.participants.findIndex(p => p.socketId === socket.id);
+    if (participantIndex !== -1) {
+      const participant = session.participants[participantIndex];
+  
+      // Удаляем связанные изображения
+      await this.prisma.participantImage.deleteMany({
+        where: { participantId: participant.id }
+      });
+  
+      // Проверяем, существует ли участник перед удалением
+      const existingParticipant = await this.prisma.participant.findUnique({
+        where: { id: participant.id }
+      });
+  
+      if (existingParticipant) {
+        // Удаляем участника
+        await this.prisma.participant.delete({
+          where: { id: participant.id }
+        });
+      }
+  
+      session.participants.splice(participantIndex, 1);
+      session.readyParticipants.delete(socket.id);
+  
+      await this.checkSessionState(io, sessionId);
+    }
   }
 
   static emitSessionUpdate(io, session) {

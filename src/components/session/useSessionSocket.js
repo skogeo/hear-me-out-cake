@@ -32,7 +32,9 @@ export const useSessionSocket = ({
     newSocket.on('connect', () => {
       console.log('Socket connected');
       setSocket(newSocket);
-      newSocket.emit('joinSession', sessionId);
+      if (sessionId) {
+        newSocket.emit('joinSession', { sessionId, username });
+      }
     });
 
     newSocket.on('disconnect', () => {
