@@ -22,6 +22,7 @@ function SessionManager() {
   const [sessionStatus, setSessionStatus] = useState('waiting');
   const [currentRevealIndex, setCurrentRevealIndex] = useState(-1);
   const [isViewingMode, setIsViewingMode] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
 
   // Setup socket connection
   useSessionSocket({
@@ -38,7 +39,8 @@ function SessionManager() {
     setImages,
     setError,
     setIsLoading,
-    setIsViewingMode
+    setIsViewingMode,
+    setSelectedImage
   });
 
   // Action handlers
@@ -148,6 +150,7 @@ function SessionManager() {
       const response = await sessionApi.reveal(sessionId);
       setCurrentRevealIndex(response.currentRevealIndex);
       setParticipants(response.participants);
+      setSelectedImage(response.selectedImage);
     } catch (err) {
       console.error('Reveal next error:', err);
       setError('Failed to reveal next');

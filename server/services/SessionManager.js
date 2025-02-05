@@ -174,10 +174,18 @@ class SessionManager {
         });
   
         if (existingParticipant) {
-          // Удаляем участника
-          await this.prisma.participant.delete({
-            where: { id: participant.id }
-          });
+          try {
+            // Удаляем участника
+            await this.prisma.participant.delete({
+              where: { id: existingParticipant.id },
+            });
+          } catch (error) {
+            if (error.code === 'P2025') {
+              console.warn('Participant record to delete does not exist.');
+            } else {
+              throw error;
+            }
+          }
         }
   
         session.participants.splice(participantIndex, 1);
@@ -241,35 +249,39 @@ class SessionManager {
     if (!session) {
       throw new Error('Session not found');
     }
-  
-    if (session.currentRevealIndex >= session.participants.length - 1) {
-      throw new Error('All participants have been revealed');
+
+    const totalImages = session.participants.reduce((acc, participant) => acc + participant.images.length, 0);
+    if (session.currentRevealIndex >= totalImages - 1) {
+      throw new Error('All images have been revealed');
     }
-  
+
     session.currentRevealIndex += 1;
-  
-    // Update session in the database
+
+    const participantIndex = session.currentRevealIndex % session.participants.length;
+    const imageIndex = Math.floor(session.currentRevealIndex / session.participants.length);
+    const selectedImage = session.participants[participantIndex].images[imageIndex];
+
     await this.prisma.session.update({
       where: { id: sessionId },
       data: {
         currentRevealIndex: session.currentRevealIndex
       }
     });
-  
-    // Emit reveal next event through socket
+
     io.to(sessionId).emit('revealNext', {
       currentRevealIndex: session.currentRevealIndex,
-      participants: session.participants
+      participants: session.participants,
+      selectedImage
     });
-  
+
     this.sessions.set(sessionId, session);
-  
+
     return {
       currentRevealIndex: session.currentRevealIndex,
-      participants: session.participants
+      participants: session.participants,
+      selectedImage
     };
   }
-
 
   static async handleLeaveSession(io, socket, { sessionId }) {
     const session = await this.getSession(sessionId);

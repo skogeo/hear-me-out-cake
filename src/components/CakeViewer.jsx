@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Heart, X, ChevronRight } from 'lucide-react';
 
-function CakeViewer({ participants, sessionId, currentRevealIndex, onRevealNext, onFinish }) {
-  const [selectedImage, setSelectedImage] = useState(null);
+function CakeViewer({ participants, sessionId, currentRevealIndex, onRevealNext, onFinish, selectedImage }) {
+  const [currentSelectedImage, setCurrentSelectedImage] = useState(null);
   const [revealedImages, setRevealedImages] = useState([]);
   const [currentParticipantName, setCurrentParticipantName] = useState('');
 
@@ -10,6 +10,12 @@ function CakeViewer({ participants, sessionId, currentRevealIndex, onRevealNext,
     console.log('CakeViewer participants:', participants);
     console.log('Current reveal index:', currentRevealIndex);
   }, [participants, currentRevealIndex]);
+
+  useEffect(() => {
+    if (selectedImage) {
+      setCurrentSelectedImage(selectedImage);
+    }
+  }, [selectedImage]);
 
   // Обновляем список раскрытых изображений при изменении индекса
   useEffect(() => {
@@ -47,7 +53,7 @@ function CakeViewer({ participants, sessionId, currentRevealIndex, onRevealNext,
     }))
   );
 
-  const handleImageClick = (image) => setSelectedImage(image);
+  const handleImageClick = (image) => setCurrentSelectedImage(image);
 
   return (
     <div className="w-full">
@@ -134,10 +140,10 @@ function CakeViewer({ participants, sessionId, currentRevealIndex, onRevealNext,
       </div>
 
       {/* Модальное окно */}
-      {selectedImage && (
+      {currentSelectedImage && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-8"
-          onClick={() => setSelectedImage(null)}
+          onClick={() => setCurrentSelectedImage(null)}
         >
           <div 
             className="relative bg-white rounded-xl shadow-2xl max-w-4xl w-full overflow-hidden"
@@ -147,10 +153,10 @@ function CakeViewer({ participants, sessionId, currentRevealIndex, onRevealNext,
             <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black to-transparent z-10">
               <div className="flex justify-between items-center">
                 <h3 className="text-xl font-semibold text-white">
-                  {selectedImage.username}&#39;s Crush
+                  {currentSelectedImage.username}&#39;s Crush
                 </h3>
                 <button
-                  onClick={() => setSelectedImage(null)}
+                  onClick={() => setCurrentSelectedImage(null)}
                   className="w-8 h-8 flex items-center justify-center bg-white/20 hover:bg-white/30 rounded-full transition-colors"
                 >
                   <X className="w-5 h-5 text-white" />
@@ -163,8 +169,8 @@ function CakeViewer({ participants, sessionId, currentRevealIndex, onRevealNext,
               {/* Image */}
               <div className="w-full md:w-2/3 relative">
                 <img
-                  src={selectedImage.preview || `${import.meta.env.VITE_API_BASE_URL}${selectedImage.imageUrl}`}
-                  alt={`${selectedImage.username}'s crush`}
+                  src={currentSelectedImage.preview || `${import.meta.env.VITE_API_BASE_URL}${currentSelectedImage.imageUrl}`}
+                  alt={`${currentSelectedImage.username}'s crush`}
                   className="w-full h-[500px] object-cover"
                   // onError={(e) => {
                   //   console.error('Image load error:', e);
@@ -182,7 +188,7 @@ function CakeViewer({ participants, sessionId, currentRevealIndex, onRevealNext,
                       Character
                     </h4>
                     <p className="text-2xl font-bold text-pink-600 mt-1">
-                      {selectedImage.characterName}
+                      {currentSelectedImage.characterName}
                     </p>
                   </div>
 
@@ -192,7 +198,7 @@ function CakeViewer({ participants, sessionId, currentRevealIndex, onRevealNext,
                       Shared by
                     </h4>
                     <p className="text-gray-600 mt-1">
-                      {selectedImage.username}
+                      {currentSelectedImage.username}
                     </p>
                   </div>
 
@@ -213,7 +219,7 @@ function CakeViewer({ participants, sessionId, currentRevealIndex, onRevealNext,
 
                 {/* Close button at bottom */}
                 <button
-                  onClick={() => setSelectedImage(null)}
+                  onClick={() => setCurrentSelectedImage(null)}
                   className="mt-auto w-full py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
                 >
                   Close

@@ -16,7 +16,8 @@ export const useSessionSocket = ({
   setImages,
   setError,
   setIsLoading,
-  setIsViewingMode
+  setIsViewingMode,
+  setSelectedImage
 }) => {
   const socketRef = useRef(null);
 
@@ -87,10 +88,11 @@ export const useSessionSocket = ({
       setIsViewingMode(true);
     });
 
-    newSocket.on('revealNext', ({ currentRevealIndex, participants }) => {
-      console.log('Reveal next:', { currentRevealIndex, participants });
+    newSocket.on('revealNext', ({ currentRevealIndex, participants, selectedImage }) => {
+      console.log('Reveal next:', { currentRevealIndex, participants, selectedImage });
       setCurrentRevealIndex(currentRevealIndex);
       setParticipants(participants);
+      setSelectedImage(selectedImage);
     });
 
     newSocket.on('error', ({ message }) => {
@@ -104,5 +106,5 @@ export const useSessionSocket = ({
       newSocket.disconnect();
     };
   }, [username, sessionId, images, setImages, setParticipants, setReadyCount, setCanStart, 
-      setSessionStatus, setCurrentRevealIndex, setIsReady, setError, setIsLoading, setIsViewingMode]);
+      setSessionStatus, setCurrentRevealIndex, setIsReady, setError, setIsLoading, setIsViewingMode, setSelectedImage]);
 };

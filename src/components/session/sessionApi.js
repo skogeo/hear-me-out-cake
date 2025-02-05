@@ -20,6 +20,9 @@ export const sessionApi = {
 
   reveal: async (sessionId) => {
     const response = await axios.post(`${API_BASE_URL}/api/sessions/${sessionId}/reveal`);
-    return response.data;
+    return {
+      ...response.data,
+      selectedImage: response.data.selectedImage
+    };
   }
 };

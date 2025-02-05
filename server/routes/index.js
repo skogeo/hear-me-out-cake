@@ -45,7 +45,10 @@ router.post('/sessions/:sessionId/reveal', async (req, res) => {
   const io = req.io; // Получаем объект io из запроса
   try {
     const result = await SessionManager.handleRevealNext(io, sessionId);
-    res.json(result);
+    res.json({
+      ...result,
+      selectedImage: result.selectedImage
+    });
   } catch (error) {
     console.error('Reveal next error:', error);
     res.status(400).json({ error: error.message });
