@@ -1,0 +1,44 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id                String        @id
+  status           String
+  created          DateTime
+  currentRevealIndex Int         @map("current_reveal_index")
+  canStart         Boolean       @map("can_start")
+  participants     Participant[]
+
+  @@map("sessions")
+}
+
+model Participant {
+  id          String   @id
+  socketId    String   @map("socket_id")
+  username    String
+  joinedAt    DateTime @map("joined_at")
+  ready       Boolean
+  sessionId   String   @map("session_id")
+  session     Session  @relation(fields: [sessionId], references: [id])
+  images      ParticipantImage[]
+
+  @@map("participants")
+}
+
+model ParticipantImage {
+  id            Int         @id @default(autoincrement())
+  imageUrl      String      @map("image_url")
+  participantId String      @map("participant_id")
+  participant   Participant @relation(fields: [participantId], references: [id])
+
+  @@map("participant_images")
+}
