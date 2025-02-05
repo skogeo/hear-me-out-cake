@@ -6,13 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "deploy": "npm run build && rimraf /var/www/hear-me-out-cake/* && copyfiles -u 1 \"dist/**/*\" /var/www/hear-me-out-cake",    "lint": "eslint .",
+    "deploy": "npm run build && rimraf /var/www/hear-me-out-cake/* && copyfiles -u 1 \"dist/**/*\" /var/www/hear-me-out-cake",
+    "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.0",
     "@heroicons/react": "^2.1.5",
     "axios": "^1.7.7",
+    "heic2any": "^0.0.4",
     "lucide-react": "^0.454.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
