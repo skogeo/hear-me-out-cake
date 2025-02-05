@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import axios from 'axios';
 import { Upload, X, Loader2, ImagePlus } from 'lucide-react';
+import heic2any from 'heic2any';
 
 const ALLOWED_TYPES = {
   'image/jpeg': ['.jpg', '.jpeg'],
@@ -51,7 +52,6 @@ function ImageUploader({ onImageUpload, maxImages = 20, existingImages = [] }) {
     let processedFile = file;
     if (file.type.includes('heic') || file.type.includes('heif')) {
       try {
-        const heic2any = (await import('heic2any')).default;
         const blob = await heic2any({
           blob: file,
           toType: 'image/jpeg',
