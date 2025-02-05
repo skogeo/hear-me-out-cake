@@ -23,9 +23,7 @@ export const useSessionSocket = ({
 
   useEffect(() => {
     const newSocket = io(import.meta.env.VITE_SOCKET_URL, {
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
+      transports: ["websocket"]
     });
 
     socketRef.current = newSocket;
