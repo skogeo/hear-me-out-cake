@@ -2,6 +2,19 @@ import { useState, useRef } from 'react';
 import axios from 'axios';
 import { Upload, X, Loader2, ImagePlus } from 'lucide-react';
 
+const ALLOWED_TYPES = {
+  'image/jpeg': ['.jpg', '.jpeg'],
+  'image/png': ['.png'],
+  'image/gif': ['.gif'],
+  'image/webp': ['.webp'],
+  'image/heic': ['.heic', '.heif'],
+  'image/heif': ['.heif'],
+  'image/bmp': ['.bmp'],
+  'image/tiff': ['.tiff', '.tif']
+};
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
 function ImageUploader({ onImageUpload, maxImages = 20, existingImages = [] }) {
   const [uploading, setUploading] = useState(false);
   const [images, setImages] = useState(existingImages);
@@ -9,6 +22,15 @@ function ImageUploader({ onImageUpload, maxImages = 20, existingImages = [] }) {
   const [currentImage, setCurrentImage] = useState(null);
   const [characterName, setCharacterName] = useState('');
   const fileInputRef = useRef();
+
+  const validateFile = (file) => {
+    if (!file) return 'No file selected';
+    if (!Object.keys(ALLOWED_TYPES).includes(file.type)) 
+      return 'Invalid file type. Supported formats: JPG, PNG, GIF, WebP, HEIC/HEIF, BMP, TIFF';
+    if (file.size > MAX_FILE_SIZE) 
+      return 'File size exceeds 10MB limit';
+    return null;
+  };
 
   const handleFileSelect = async (event) => {
     const file = event.target.files[0];
@@ -19,17 +41,40 @@ function ImageUploader({ onImageUpload, maxImages = 20, existingImages = [] }) {
       return;
     }
 
-    // Создаем превью
+    const validationError = validateFile(file);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    // Convert HEIC/HEIF to JPEG if needed
+    let processedFile = file;
+    if (file.type.includes('heic') || file.type.includes('heif')) {
+      try {
+        const heic2any = (await import('heic2any')).default;
+        const blob = await heic2any({
+          blob: file,
+          toType: 'image/jpeg',
+          quality: 0.8
+        });
+        processedFile = new File([blob], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { 
+          type: 'image/jpeg' 
+        });
+      } catch (error) {
+        setError('Failed to convert HEIC/HEIF image');
+        return;
+      }
+    }
+
     const reader = new FileReader();
     reader.onload = () => {
       setCurrentImage({
-        file,
+        file: processedFile,
         preview: reader.result
       });
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(processedFile);
 
-    // Очищаем поле ввода для возможности повторной загрузки того же файла
     event.target.value = '';
   };
 
@@ -61,7 +106,6 @@ function ImageUploader({ onImageUpload, maxImages = 20, existingImages = [] }) {
       setImages(prev => [...prev, newImage]);
       onImageUpload(newImage);
 
-      // Очищаем форму
       setCurrentImage(null);
       setCharacterName('');
     } catch (error) {
@@ -71,53 +115,39 @@ function ImageUploader({ onImageUpload, maxImages = 20, existingImages = [] }) {
     }
   };
 
-  const removeImage = (index) => {
-    setImages(prev => {
-      const newImages = [...prev];
-      newImages.splice(index, 1);
-      return newImages;
-    });
-  };
-
-  const cancelUpload = () => {
-    setCurrentImage(null);
-    setCharacterName('');
-    setError('');
-  };
-
   return (
     <div className="space-y-6">
-      {/* Upload button or preview */}
-      {!currentImage && (
-        <div className="flex items-center gap-4">
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileSelect}
-            accept="image/*"
-            className="hidden"
-            disabled={uploading || images.length >= maxImages}
-          />
-          <button
-            onClick={() => fileInputRef.current.click()}
-            disabled={uploading || images.length >= maxImages}
-            className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
-              images.length >= maxImages
-                ? 'bg-gray-300 cursor-not-allowed'
-                : 'bg-blue-500 hover:bg-blue-600 text-white'
-            }`}
-          >
-            <ImagePlus className="w-5 h-5" />
-            Add Image
-          </button>
-          <span className="text-sm text-gray-500">
-            {images.length}/{maxImages} images
-          </span>
-        </div>
-      )}
+      <div className={!currentImage ? "flex items-center gap-4" : "hidden"}>
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileSelect}
+          accept={Object.entries(ALLOWED_TYPES)
+            .map(([type, exts]) => `${type},${exts.join(',')}`)
+            .join(',')}
+          className="hidden"
+          disabled={uploading || images.length >= maxImages}
+          capture="environment"
+        />
+        <button
+          onClick={() => fileInputRef.current.click()}
+          disabled={uploading || images.length >= maxImages}
+          className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
+            images.length >= maxImages
+              ? 'bg-gray-300 cursor-not-allowed'
+              : 'bg-blue-500 hover:bg-blue-600 text-white'
+          }`}
+        >
+          <ImagePlus className="w-5 h-5" />
+          Add Image
+        </button>
+        <span className="text-sm text-gray-500">
+          {images.length}/{maxImages} images
+        </span>
+      </div>
 
-      {/* Preview and character name input */}
-      {currentImage && (
+           {/* Preview and character name input */}
+           {currentImage && (
         <div className="bg-gray-50 rounded-lg p-4 space-y-4">
           <div className="flex gap-4 items-start">
             <div className="relative group">
